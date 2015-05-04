@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "../random.h"
 #include <stdlib.h>
+#include <string.h>
 
 /* Returns 0 on failure and 1 on success */
 int init_png_file(const char* inputfile, unsigned long int* key);

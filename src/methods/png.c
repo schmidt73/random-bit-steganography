@@ -1,43 +1,58 @@
 #include "png.h"
 
 #define PNG_SIGNATURE {137, 80, 78, 71, 13, 10, 26, 10}
-#define IHDR_SIGNATURE {'I', 'H', 'D', 'R'}
+#define IHDR_SIGNATURE "IHDR"
+#define IDAT_SIGNATURE "IDAT"
 
 static unsigned long int width = 0;
 static unsigned long int height = 0;
 static unsigned long int bit_depth = 0;
-static unsigned long int bit_depth = 0;
+static unsigned long int color_type = 0;
 
 static unsigned long int* encryption_key = 0;
 static FILE* file = 0;
 static unsigned int current_chunksize = 0;
 
 static unsigned char png_signature[] = PNG_SIGNATURE;
-static unsigned char ihdr_signature[] = IHDR_SIGNATURE;
+
+static unsigned char* decode_pixel_data(unsigned char* idat_chunk_data){
+  return 0;
+}
+
+/* 
+  Returns 1 if a chunk has the same 4-byte header as passed to the function, otherwise 0. 
+*/
+static int chunk_has_header(unsigned char* chunk, int chunklength, const char* header, int headerlength){
+  if(headerlength < 4 || chunklength < 12){
+    return 0;
+  }
+
+  for(int i = 4; i < 8; i++){
+    if(chunk[i] != header[i - 4])
+      return 0;
+  }
+
+  return 1;
+}
 
 /* This method will only work if started at the end of a chunk. */
 static unsigned char* get_next_chunk(FILE* file){
-  unsigned char* buffer = (unsigned char*) malloc(sizeof(char) * 1024);
+  unsigned char* buffer = (unsigned char*) malloc(sizeof(char) * 8);
   unsigned char* chunk = 0;
   fpos_t pos;
 
   if(fgetpos(file, &pos) != 0){
-    fprintf(stderr, "getting file position failed\n");
     free(buffer);
     return chunk;
   }
 
-  for(int i = 0;)
-
   if(fread(buffer, sizeof(char), 8, file) != 8){
-    fprintf(stderr, "couldn't read chunk\n");
     free(buffer);
     return chunk;
   }
 
   for(int i = 4; i < 8; i++){
     if(buffer[i] < 0x41 || (buffer[i] > 0x5A && buffer[i] < 0x60) || buffer[i] > 0x7A){
-        fprintf(stderr, "couldn't read chunk\n");
         free(buffer);
         return chunk;
     }
@@ -58,7 +73,11 @@ static unsigned char* get_next_chunk(FILE* file){
   free(buffer);
   fsetpos(file, &pos);
   chunk = (unsigned char*) malloc(sizeof(char) * current_chunksize);
-  fread(chunk, sizeof(char), current_chunksize, file);
+
+  while(current_chunksize != fread(chunk, sizeof(char), current_chunksize, file)){
+    return 0;
+  }
+
   return chunk;
 }
 
@@ -90,17 +109,14 @@ int init_png_file(const char* inputfile, unsigned long int* key)
   }
 
   unsigned char* ihdr_chunk = get_next_chunk(file);
-  int ihdr_flag = 1;
 
-  for(int i = 4; i < 8; i++){
-    if(ihdr_chunk[i] != ihdr_signature[i - 4]){
-      ihdr_flag = 0;
-      break;
+  if(current_chunksize < 25 || ihdr_chunk == 0 || chunk_has_header(ihdr_chunk, current_chunksize, IHDR_SIGNATURE, 4) == 0){
+    if(ihdr_chunk == 0){
+      fprintf(stderr, "serious read error!\n");
+    }else{
+      fprintf(stderr, "couldn't find ihdr_chunk.\n");
     }
-  }
 
-  if(current_chunksize < 25 || ihdr_chunk == 0 || ihdr_flag == 0){
-    fprintf(stderr, "couldn't find ihdr_chunk\n");
     if(ihdr_chunk != 0) free(ihdr_chunk);
     free(buffer);
     return 0;
@@ -130,8 +146,14 @@ int init_png_file(const char* inputfile, unsigned long int* key)
     }
   }
 
-  if(height < 1 || width < 1 || ){
-    fprintf(stderr, "invalid width, height, \n");
+  data_section_index += 4;
+
+  bit_depth = (unsigned long int) ihdr_chunk[data_section_index];
+  data_section_index++;
+  color_type = (unsigned long int) ihdr_chunk[data_section_index];
+
+  if(height < 1 || width < 1 || bit_depth < 1){
+    fprintf(stderr, "invalid width, height, or bit_depth\n");
   }
 
   free(ihdr_chunk);
@@ -141,11 +163,36 @@ int init_png_file(const char* inputfile, unsigned long int* key)
 
 int decrypt_png_file()
 {
-  fprintf(stderr, "File is decryptable. File width: %lu height: %lu bit-depth: %lu color-type: %lu\n", width, height, bit-depth, color-type);
+  fprintf(stderr, "File is decryptable. File width: %lu height: %lu bit-depth: %lu color-type: %lu\n", width, height, bit_depth, color_type);
+
+  unsigned char* chunk = 0;
+  unsigned char* data = 0;
+  unsigned int count = 0; 
+  while((chunk = get_next_chunk(file)) != 0){
+    if(chunk_has_header(chunk, current_chunksize, IDAT_SIGNATURE, 4)){
+      if(current_chunksize > 12){
+        data = realloc(data, current_chunksize + count - 12);
+        memcpy(data + count, chunk + 8, current_chunksize - 12);
+        count += current_chunksize - 12;
+      }
+    }
+
+    free(chunk);
+  }
+
+  for(int i = 0; i < count; i++){
+    printf("%c", data[i]);
+  }
+
+  fprintf(stderr, "%u\n", count);
+
+  fclose(file);
   return 0;
 }
 
 int encrypt_png_file()
 {
+
+  fclose(file);
   return 0;
 }

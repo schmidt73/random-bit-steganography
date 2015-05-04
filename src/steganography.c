@@ -86,7 +86,7 @@ int init_encrypting_data(const char* type, const char* inputfile, unsigned long 
 }
 
 int main(int argc, char **argv)
-{
+{	
 	const char* type = 0, *inputfile = 0, *mode = 0;
 	unsigned long int *key = 0;
 	int c = -1;
