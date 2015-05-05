@@ -1,5 +1,5 @@
 CC = gcc
-FILES = src/*.c src/methods/*.c
+FILES = src/*.c src/methods/*.c src/libs/*.c
 OUT_EXE = rb-stegano
 
 build: $(FILES)

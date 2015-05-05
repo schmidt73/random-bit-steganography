@@ -37,23 +37,20 @@ static int chunk_has_header(unsigned char* chunk, int chunklength, const char* h
 
 /* This method will only work if started at the end of a chunk. */
 static unsigned char* get_next_chunk(FILE* file){
-  unsigned char* buffer = (unsigned char*) malloc(sizeof(char) * 8);
+  unsigned char buffer[8] = {0};
   unsigned char* chunk = 0;
   fpos_t pos;
 
   if(fgetpos(file, &pos) != 0){
-    free(buffer);
     return chunk;
   }
 
-  if(fread(buffer, sizeof(char), 8, file) != 8){
-    free(buffer);
+  if(fread(&buffer, sizeof(char), 8, file) != 8){
     return chunk;
   }
 
   for(int i = 4; i < 8; i++){
     if(buffer[i] < 0x41 || (buffer[i] > 0x5A && buffer[i] < 0x60) || buffer[i] > 0x7A){
-        free(buffer);
         return chunk;
     }
   }
@@ -70,7 +67,6 @@ static unsigned char* get_next_chunk(FILE* file){
 
   current_chunksize = 12 + length;
 
-  free(buffer);
   fsetpos(file, &pos);
   chunk = (unsigned char*) malloc(sizeof(char) * current_chunksize);
 

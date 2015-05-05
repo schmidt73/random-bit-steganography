@@ -1,10 +1,4 @@
-#include "random.h"
-#include <stdlib.h>
-#include <getopt.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include "methods/png.h"
+#include "steganography.h"
 
 #define SUPPORTED_FILE_TYPES {"gif", "png", "jpeg", "jpg", "mp3"}
 #define PROGRAM_NAME "random-bit stegano"
