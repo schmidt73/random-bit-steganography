@@ -2,9 +2,9 @@
 
 **What is it?**
 
-The idea of this program is simple: to combine steganography and encryption together, thus creating an advanced and powerful steganography implementation. Most steganography implementations have no built in encryption and putting your unencrypted data inside of them is really dangerous if the intercepter realizes that you are hiding data inside of the carrier. A simple workaround would be to encrypt your data beforehand and then use steganography to hide your data inside of the carrier, but then it can still be obvious that you are sending encrypted data.
+The goal of this project is simple: to create a method of steganography that hides data differently in a file for any given key. Most steganography implementations have no built in entropy (randomness) and each time the steganography algorithm is ran on the same data, the data will appear in the same parts of the file.
 
-That is where R.B.S. comes in. The goal behind this project is to create an advanced steganography implementation that can take raw data and safely hide it inside of a carrer, even when the carrier is known to hidden data inside of it. Random Bit Steganography accomplishes this by using a 96-bit key which is used to generate a unique sequence of random bits that is used to hide data. Random Bit Steganography hides each bit of data at a location within the file that is random, while not effecting the quality of the carrier to much, wether it be an image, an audio file, etc.
+This is where Random Bit Steganography comes in. R.B.S hides each bit of data at a location within the file that is random, while not effecting the quality of the carrier to much, wether it be an image, an audio file, etc. This is very beneficial as steganylsis software could no longer retrieve the data purely by reversing the algorithm. 
 
 **Installation**
 
