@@ -5,8 +5,11 @@
 #include "../random.h"
 #include <stdlib.h>
 #include <string.h>
+#include "../libs/miniz.h"
 
-/* Returns 0 on failure and 1 on success */
+static unsigned char* decode_pixel_data();
+static void free_chunks();
+static int load_png_chunks();
 int init_png_file(const char* inputfile, unsigned long int* key);
 int decrypt_png_file();
 int encrypt_png_file();
