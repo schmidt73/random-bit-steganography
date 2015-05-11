@@ -12,7 +12,7 @@
 const char* get_filename_ext(const char *filename);
 void print_version();
 void print_usage();
-int init_decrypting_data(const char* type, const char* inputfile, unsigned long int* key);
-int init_encrypting_data(const char* type, const char* inputfile, unsigned long int* key);
+int init_decrypting_data(const char* type, const char* inputfile);
+int init_encrypting_data(const char* type, const char* inputfile);
 
 #endif

@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 void isaac(unsigned long int buffer[], int length);
-void set_key(unsigned long int key[], int length);
+void set_key(char* key, int length);
 void rand_init();
 
 #endif 

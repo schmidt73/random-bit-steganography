@@ -21,7 +21,7 @@ void print_usage()
 
 	fprintf(stderr, "usage: %s [-t filetype] -m encryption | decryption -k encryptionkey -i inputfile [< | > datastream]\n", PROGRAM_NAME);
 	fprintf(stderr, "\t-m mode: encryption or decryption\n");
-	fprintf(stderr, "\t-k encryptionkey: 3 32-bit unsigned integers as an encryption key\n\t\texample: -k 3000 4294967296 230213\n");
+	fprintf(stderr, "\t-k encryptionkey: up to a 1024-byte encryption key\n\t\texample: -k 58313907894542357986579124\n");
 	fprintf(stderr, "\t-t filetype: the type of file of the inputfile\n");
 	fprintf(stderr, "\t\tsupported file types:");
 
@@ -33,11 +33,11 @@ void print_usage()
 	fprintf(stderr, "\t-i inputfile: the file the data will be hidden inside of if encyp\n");
 	fprintf(stderr, "\tdatastream\n\t\tduring encryption a pipe containing the data to encrypt\n\t\tduring decryption a pipe to the output of the decryption\n");
 	fprintf(stderr, "\ntypical usage example:\n");
-	fprintf(stderr, "\tencrypt data from inputdata.txt in png test.png: %s -m encryption -k 112323 109 12 -i test.png < inputdata.txt\n", PROGRAM_NAME);
-	fprintf(stderr, "\tdecrypt data from test.png and put output in output.txt: %s -m decryption -k 112323 109 12 -i test.png > output.txt\n", PROGRAM_NAME);
+	fprintf(stderr, "\tencrypt data from inputdata.txt in png test.png: %s -m encryption -k 12321312312312312312312 -i test.png < inputdata.txt\n", PROGRAM_NAME);
+	fprintf(stderr, "\tdecrypt data from test.png and put output in output.txt: %s -m decryption -k 12321312312312312312312 -i test.png > output.txt\n", PROGRAM_NAME);
 }
 
-int init_decrypting_data(const char* type, const char* inputfile, unsigned long int* key)
+int init_decrypting_data(const char* type, const char* inputfile)
 {
 	int ret = 0;
 
@@ -48,7 +48,7 @@ int init_decrypting_data(const char* type, const char* inputfile, unsigned long 
 	}else if(strcmp(type, "mp3") == 0){
 
 	}else if(strcmp(type, "png") == 0){
-		if(init_png_file(inputfile, key)){
+		if(init_png_file(inputfile) == 0){
 			ret = decrypt_png_file();
 		}
 	}else{
@@ -59,7 +59,7 @@ int init_decrypting_data(const char* type, const char* inputfile, unsigned long 
 	return ret;
 }
 
-int init_encrypting_data(const char* type, const char* inputfile, unsigned long int* key)
+int init_encrypting_data(const char* type, const char* inputfile)
 {
 	int ret = 0;
 
@@ -70,7 +70,9 @@ int init_encrypting_data(const char* type, const char* inputfile, unsigned long 
 	}else if(strcmp(type, "mp3") == 0){
 
 	}else if(strcmp(type, "png") == 0){
-
+		if(init_png_file(inputfile) == 0){
+			ret = encrypt_png_file();
+		}
 	}else{
 		fprintf(stderr, "undetected file type: %s\nplease specify a known file type\n", type);
 		ret = -1;
@@ -82,7 +84,8 @@ int init_encrypting_data(const char* type, const char* inputfile, unsigned long 
 int main(int argc, char **argv)
 {	
 	const char* type = 0, *inputfile = 0, *mode = 0;
-	unsigned long int *key = 0;
+	char key[1024] = {0};
+	unsigned int key_length = 0;
 	int c = -1;
 
 	for(int i = 0; i < argc; i++){
@@ -98,16 +101,10 @@ int main(int argc, char **argv)
 	while((c = getopt(argc, argv, "m:t:i:k:hv")) != -1){
 		switch(c){
 			case 'k':
-				if(argc > optind + 1){
-					int count = 0;
-					char* testptr = 0;
-					key = malloc(sizeof(unsigned long int) * 3);
-					key[0] = strtoul(optarg, &testptr, 10);
-					key[1] = strtoul(argv[optind], &testptr, 10);
-					if(*testptr == '\0') count++;
-					key[2] = strtoul(argv[optind + 1], &testptr, 10);
-					if(*testptr == '\0') count++;
-					optind += count;
+				if(strlen(optarg) < 1024){
+					memcpy(key, optarg, strlen(optarg));
+				}else{
+					memcpy(key, optarg, 1024);
 				}
 				break;
 			case 'm':
@@ -145,13 +142,19 @@ int main(int argc, char **argv)
 		type = get_filename_ext(inputfile);
 	}
 
+	set_key(key, 1024);
+
+	for(int i = 0; i < 10; i++){
+    	isaac(0, 0);
+  	}
+
 	if(strcmp(mode, "encryption") == 0){
 		if(isatty(STDIN_FILENO)){
 			print_usage();
 			return -1;
 		}
 
-		return init_encrypting_data(type, inputfile, key);
+		return init_encrypting_data(type, inputfile);
 	}
 	else if(strcmp(mode, "decryption") == 0){
 		if(isatty(STDOUT_FILENO)){
@@ -159,7 +162,7 @@ int main(int argc, char **argv)
 			return -1;
 		}
 
-		return init_decrypting_data(type, inputfile, key);
+		return init_decrypting_data(type, inputfile);
 	}else{
 		print_usage();
 		return -1;

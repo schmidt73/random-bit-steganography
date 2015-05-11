@@ -1,265 +1,292 @@
 #include "png.h"
 
-#define PNG_SIGNATURE {137, 80, 78, 71, 13, 10, 26, 10}
-#define IHDR_SIGNATURE 'I' + 'H' + 'D' + 'R'
-#define IDAT_SIGNATURE 'I' + 'D' + 'A' + 'T'
-#define IEND_SIGNATURE 'I' + 'E' + 'N' + 'D'
+static const char* file_name = 0;
+static unsigned char* decoded_image_data = 0;
+static unsigned int height = 0;
+static unsigned int width = 0;
+static size_t png_size = 0;
+static LodePNGState state;
 
-static unsigned long int width = 0;
-static unsigned long int height = 0;
-static unsigned long int bit_depth = 0;
-static unsigned long int color_type = 0;
-
-static unsigned long int* encryption_key = 0;
-static FILE* file = 0;
-static unsigned int current_chunksize = 0;
-
-static unsigned char png_signature[] = PNG_SIGNATURE;
-
-struct png_chunk {
-  unsigned int data_length;
-  unsigned int chunk_id;
-  unsigned char *data;
-  unsigned int chunk_crc;
-};
-
-static int number_of_chunks = 0;
-static struct png_chunk* chunks = NULL;
-
-static unsigned char* decode_pixel_data(){
+/* Returns the start of the block */
+static unsigned int find_highest_complexity_block(unsigned long int number_of_bytes, unsigned int *block_height, unsigned int *block_width){
   return 0;
 }
 
-static void free_chunks(){
-  for(int i = 0; i < number_of_chunks; i++){
-    if(chunks[i].data != NULL) free(chunks[i].data);
-  }
-
-  number_of_chunks = 0;
-  free(chunks);
-}
-
-static int load_png_chunks(){
-  unsigned char buffer[1024];
-  unsigned char* file_data = NULL;
-
-  fseek(file, 0L, SEEK_END);
-  int file_size = ftell(file);
-  fseek(file, 0L, SEEK_SET);
-
-  file_data = malloc(sizeof(char) * file_size);
-
-  int total_bytes_read = 0;
-  int bytes_read = 0;
-  while((bytes_read = fread(buffer, sizeof(char), 1024, file)) == 1024){
-    memcpy(file_data + total_bytes_read, buffer, bytes_read);
-    total_bytes_read += bytes_read;
-  }
-
-  if(bytes_read > 0){  
-    memcpy(file_data + total_bytes_read, buffer, bytes_read);
-    total_bytes_read += bytes_read;
-  }
-
-  if(file_size != total_bytes_read){
-    free(file_data);
-    return 0;
-  }
-  
-  for(int i = 0; i < 8; i++){
-    if(png_signature[i] != file_data[i]){
-      fprintf(stderr, "couldn't read file\n");
-      free(file_data);
-      return 0;
-    }
-  }
-
-  int index = 8;
-  int flag = 1;
-  while(flag){
-    if(index + 12 > file_size){
-      flag = 0;
-      break;
-    }
-
-    struct png_chunk current_chunk;
-    current_chunk.data_length = (file_data[index] << 24) + (file_data[index + 1] << 16) + (file_data[index + 2] << 8) + file_data[index + 3];
-    index += 4;
-
-    current_chunk.chunk_id = file_data[index] + file_data[index + 1] + file_data[index + 2] + file_data[index + 3];
-    index += 4;
-
-    if(index + 4 + current_chunk.data_length > file_size){
-      flag = 0;
-      break;
-    }
-
-    if(current_chunk.data_length > 0){
-      unsigned char* chunk_data = malloc(current_chunk.data_length * sizeof(char));
-      for(int i = 0; i < current_chunk.data_length; i++){
-        chunk_data[i] = file_data[index + i];
-      }
-
-      current_chunk.data = chunk_data;
-    }else{
-      current_chunk.data = NULL;
-    }
-
-    index += current_chunk.data_length;
-
-    current_chunk.chunk_crc = (file_data[index] << 24) + (file_data[index + 1] << 16) + (file_data[index + 2] << 8) + file_data[index + 3];
-    index += 4;
-
-    chunks = realloc(chunks, sizeof(struct png_chunk) * (number_of_chunks + 1));
-    if(memcpy(chunks + number_of_chunks, &current_chunk, sizeof(struct png_chunk)) == NULL && chunks != NULL){
-      realloc(chunks, sizeof(struct png_chunk) * (number_of_chunks));
-    }else{
-      number_of_chunks++;
-    }
-
-    if(current_chunk.chunk_id == IEND_SIGNATURE){
-      flag = 1;
-      break;
-    }
-  }
-
-  if(flag == 0){
-    free(file_data);
-    return 0;
-  }  
-
-  free(file_data);
-  return 1;
-}
-
-int init_png_file(const char* inputfile, unsigned long int* key)
+int init_png_file(const char* input_file)
 {
-  size_t readsize = 0;
-  unsigned char* buffer = (unsigned char*) malloc(sizeof(char) * 1024);
-  encryption_key = key;
+  unsigned int error = 0;
+  unsigned char* encoded_image_data = 0;
+  file_name = input_file;
 
-  file = fopen(inputfile, "r+b");
-  if(file == NULL){
-    fprintf(stderr, "couldn't open file\n");
-    free_chunks();
-    free(buffer);
-    return 0;
+  lodepng_state_init(&state);
+  error = lodepng_load_file(&encoded_image_data, &png_size, input_file);
+
+  if(error){
+    fprintf(stderr, "couldn't load file\n");
+    lodepng_state_cleanup(&state);
+    return 1;
   }
 
-  if(load_png_chunks() == 0){
-    fprintf(stderr, "couldn't open file1\n");
-    free_chunks();
-    free(buffer);
-    return 0;
+  error = lodepng_inspect(&width, &height, &state, encoded_image_data, png_size);
+
+  if(error){
+    fprintf(stderr, "couldn't get png info\n");
+    lodepng_state_cleanup(&state);
+    return 1;
   }
 
-  if(number_of_chunks < 3){
-    fprintf(stderr, "Not complete PNG file\n");
-    free_chunks();
-    free(buffer);
-    return 0;
+  state.info_raw = state.info_png.color;
+  state.encoder.auto_convert = 0;
+
+  error = lodepng_decode(&decoded_image_data, &width, &height, &state, encoded_image_data, png_size);
+  free(encoded_image_data);
+
+  if(error || decoded_image_data == 0){
+    fprintf(stderr, "couldn't decode file\n");
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
   }
 
-  int data_section_index = 0;
-
-  width = 0;
-  for(int i = 0; i < 4; i++){
-    if(i == 3){
-      width += chunks->data[data_section_index + i];
-    }else{
-      width += chunks->data[data_section_index + i];
-      width = width << 8;
-    }
-  }
-
-  data_section_index += 4;
-
-  height = 0;
-  for(int i = 0; i < 4; i++){
-    if(i == 3){
-      height += chunks->data[data_section_index + i];
-    }else{
-      height += chunks->data[data_section_index + i];
-      height = height << 8;
-    }
-  }
-
-  data_section_index += 4;
-
-  bit_depth = (unsigned long int) chunks->data[data_section_index];
-  data_section_index++;
-  color_type = (unsigned long int) chunks->data[data_section_index];
-
-  if(height < 1 || width < 1 || height > 2147483647 || width > 2147483647 || bit_depth < 1){
-    fprintf(stderr, "invalid width, height, or bit_depth\n");
-  }
-
-  free(buffer);
-  return 1;
+  return 0;
 }
 
 int decrypt_png_file()
 {
-  fprintf(stderr, "File is decryptable. File width: %lu height: %lu bit-depth: %lu color-type: %lu\n", width, height, bit_depth, color_type);
+  unsigned long int first_isaac_buffer[256];
+  isaac(first_isaac_buffer, 256);
 
-  unsigned char* data = 0;
-  unsigned int count = 0; 
-
-  for(int i = 0; i < number_of_chunks; i++){
-    if(chunks[i].chunk_id == IDAT_SIGNATURE){
-      if(chunks[i].data_length > 0){
-        data = realloc(data, chunks[i].data_length + count);
-        memcpy(data + count, chunks[i].data, chunks[i].data_length);
-        count += chunks[i].data_length;
+  int bitdepth = state.info_raw.bitdepth;
+  int bits_per_pixel = -1;
+  switch(state.info_raw.colortype){
+    case LCT_GREY:
+      if(bitdepth == 1 || bitdepth == 2 || bitdepth == 4 || bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = bitdepth;
       }
+
+      break;
+    case LCT_RGB:
+      if(bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = 3 * bitdepth;
+      }
+      break;
+    case LCT_PALETTE:
+      if(bitdepth == 1 || bitdepth == 2 || bitdepth == 4 || bitdepth == 8){
+        bits_per_pixel = bitdepth;
+      }
+      break;
+    case LCT_GREY_ALPHA:
+      if(bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = bitdepth * 2;
+      }
+      break;
+    case LCT_RGBA:
+      if(bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = 4 * bitdepth;
+      }
+      break;
+    default:
+      break;
+  }
+
+  if(bits_per_pixel == -1){
+    fprintf(stderr, "invalid bitdepth and color type\n");
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
+  }
+
+  uint32_t number_of_bytes = 0;
+  if(bits_per_pixel % 8 == 0){
+    int bytes_per_pixel = bits_per_pixel / 8;
+    for(int x = 0; x < (sizeof(uint32_t) * 8); x++){
+      number_of_bytes = number_of_bytes + ((first_isaac_buffer[x] & 1) ^ (decoded_image_data[bytes_per_pixel * x] & 1));
+      if(x != (sizeof(uint32_t) * 8) - 1) number_of_bytes = number_of_bytes << 1; 
     }
   }
 
-  unsigned char* inflated_data = 0;
-  unsigned long int inflated_data_size = 0;
-  unsigned char inflated_data_buffer[1024];
+  if(number_of_bytes == 0){
 
-  mz_stream stream;
-  memset(&stream, 0, sizeof(stream));
-
-  stream.next_in = data;
-  stream.avail_in = (mz_uint32) count;
-  stream.next_out = inflated_data_buffer;
-  stream.avail_out = (mz_uint32) 1024;
-
-  int status = 0;
-  mz_inflateInit(&stream);
-
-  do{
-    stream.avail_out = 1024;
-    stream.next_out = inflated_data_buffer;
-    status = inflate(&stream, Z_NO_FLUSH);
-    unsigned int bytes_read = 1024 - stream.avail_out;
-    inflated_data_size += bytes_read;
-    inflated_data = realloc(inflated_data, inflated_data_size);
-    memcpy(inflated_data + inflated_data_size - bytes_read, inflated_data_buffer, bytes_read);
-  }while (stream.avail_out == 0);
-
-  free(data);
-
-  if(status != MZ_STREAM_END){
-    fprintf(stderr, "failed at decompressing IDAT chunks\n");
-    return -1;
   }
 
-  mz_inflateEnd(&stream);
-
-  for(int i = 0; i < inflated_data_size; i++){
-    printf("%c", inflated_data[i]);
-  }
-
-  fclose(file);
   return 0;
 }
 
+
+
 int encrypt_png_file()
 {
+  unsigned int block_width = 0, block_height = 0, block_x = 0, block_y = 0;
+  unsigned long int first_isaac_buffer[256];
+  unsigned long int isaac_buffer[256];
 
-  fclose(file);
+  isaac(first_isaac_buffer, 256);
+
+  unsigned char in_buffer[1024];
+  unsigned char* in_bytes = 0;
+  uint32_t n_in_bytes = 0;
+
+  unsigned int count = 0;
+  while((count = fread(in_buffer, sizeof(char), 1024, stdin)) != 0){
+    if(in_bytes == NULL){
+      in_bytes = malloc(n_in_bytes + count);
+    }else{
+      in_bytes = realloc(in_bytes + n_in_bytes, n_in_bytes + count);
+    }
+
+    memcpy(in_bytes + n_in_bytes, in_buffer, count);
+    n_in_bytes += count;
+    if(count != 1024){
+      break;
+    }
+  }
+  
+  if(in_bytes == NULL){
+    fprintf(stderr, "read failed\n");
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
+  }
+
+  unsigned int block_area = n_in_bytes * 8;
+
+  if(block_area > (width * height) - (sizeof(uint32_t) * 8)){
+    fprintf(stderr, "not enough space in image to encode data\n");
+    free(in_bytes);
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
+  }
+
+  unsigned int height_mask = 1;
+  while(height_mask < height){
+    height_mask = (height_mask << 1) + 1;
+  }
+
+  unsigned int width_mask = 1;
+  while(width_mask < width){
+    width_mask = (width_mask << 1) + 1;
+  }
+
+  int index = 0;
+  while((block_width * block_height) < block_area || block_width > width || block_height > height){
+    if(index + 1 > 255){
+      isaac(isaac_buffer, 256);
+      index = 0;
+    }
+
+    block_height = isaac_buffer[index] & height_mask;
+    block_width = isaac_buffer[index + 1] & width_mask;
+    index += 2;
+  }
+
+  index = 0;
+  do{
+    if(index + 1> 255){
+      isaac(isaac_buffer, 256);
+      index = 0;
+    }
+
+    block_x = isaac_buffer[index] & width_mask;
+    block_y = isaac_buffer[index + 1] & height_mask;
+    index += 2;
+  }while((block_x + block_width > width) || (block_y + block_height > height) || block_x < (sizeof(uint32_t) * 8));
+
+  int bitdepth = state.info_raw.bitdepth;
+  int bits_per_pixel = -1;
+  switch(state.info_raw.colortype){
+    case LCT_GREY:
+      if(bitdepth == 1 || bitdepth == 2 || bitdepth == 4 || bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = bitdepth;
+      }
+      break;
+    case LCT_RGB:
+      if(bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = 3 * bitdepth;
+      }
+      break;
+    case LCT_PALETTE:
+      if(bitdepth == 1 || bitdepth == 2 || bitdepth == 4 || bitdepth == 8){
+        bits_per_pixel = bitdepth;
+      }
+      break;
+    case LCT_GREY_ALPHA:
+      if(bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = bitdepth * 2;
+      }
+      break;
+    case LCT_RGBA:
+      if(bitdepth == 8 || bitdepth == 16){
+        bits_per_pixel = 4 * bitdepth;
+      }
+      break;
+    default:
+      break;
+  }
+
+  fprintf(stderr, "block_width %d width: %d block_height: %d height: %d block_x: %d block_y: %d bits_per_pixel: %d colortype: %d\n", block_width, width, block_height, height, block_x, block_y, bits_per_pixel, state.info_raw.colortype);
+
+  if(bits_per_pixel == -1){
+    fprintf(stderr, "invalid bitdepth and color type\n");
+    free(in_bytes);
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
+  }
+
+  if(bits_per_pixel % 8 == 0){
+    int bytes_per_pixel = bits_per_pixel / 8;
+    for(int x = 0; x < (sizeof(uint32_t) * 8); x++){
+      if((1 & (n_in_bytes >> ((sizeof(uint32_t) * 8) - 1 - x))) ^ (1 & first_isaac_buffer[x])){
+        decoded_image_data[bytes_per_pixel * x] |= (1);
+      }else{
+        decoded_image_data[bytes_per_pixel * x] &= (~1);
+      }
+    }
+
+    index = 0;
+    for(int x = 0; x < block_width; x++){
+      if(index >= n_in_bytes * 8) break;
+      for(int y = 0; y < block_height; y++){
+        if(index >= n_in_bytes * 8) break;
+        if(1 & (in_bytes[index / 8] >> index % 8)){
+          decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] |= 1;
+        }else{
+          decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] &= (~1);
+        }
+
+        index++;
+      }
+    }
+  }else{
+    fprintf(stderr, "error\n");
+    free(in_bytes);
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
+  }
+
+  free(in_bytes);
+
+  unsigned char* output_png = 0;
+  int error;
+  error = lodepng_encode(&output_png, &png_size, decoded_image_data, width, height, &state);
+
+  free(decoded_image_data);
+  lodepng_state_cleanup(&state);
+
+  if(error){
+    fprintf(stderr, "couldn't encode image data\n");
+    return 1;
+  }
+
+  error = lodepng_save_file(output_png, png_size, file_name);
+
+  free(output_png);
+  if(error){
+    fprintf(stderr, "couldn't save to file\n");
+    return 1;
+  }
+
   return 0;
 }
