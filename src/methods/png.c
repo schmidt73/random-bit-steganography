@@ -178,10 +178,10 @@ int decrypt_png_file()
   if(bits_per_pixel % 8 == 0){
     int bytes_per_pixel = bits_per_pixel / 8;
     index = 0;
+
     int rand_count = 0;
     unsigned char current_char = 0;
-    unsigned char* char_pointer = &current_char;
-
+    int pixel_index = 0;
     for(int x = 0; x < block_width; x++){
       if(index > number_of_bytes * 8 - 1) break;
       for(int y = 0; y < block_height; y++){
@@ -191,10 +191,11 @@ int decrypt_png_file()
           isaac(isaac_buffer, 256);
         }
 
-        int bit = ((1 & isaac_buffer[rand_count]) ^ (decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] & 1));
+        if(bytes_per_pixel > 1) pixel_index = isaac_buffer[rand_count] % (bytes_per_pixel - 1);
+        int bit = ((1 & isaac_buffer[rand_count]) ^ (decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x) + pixel_index] & 1));
 
         if(index % 8 == 0 && index != 0){
-          fwrite(char_pointer, sizeof(char), 1, stdout);
+          fwrite(&current_char, sizeof(char), 1, stdout);
           fflush(stdout);
           current_char = 0;
         }
@@ -207,7 +208,7 @@ int decrypt_png_file()
       }
     }
 
-    fwrite(char_pointer, sizeof(char), 1, stdout);
+    fwrite(&current_char, sizeof(char), 1, stdout);
     fflush(stdout);
   }
 
@@ -376,7 +377,7 @@ int encrypt_png_file()
 
     index = 0;
     int rand_count = 0;
-    unsigned char current_char = 0;
+    int pixel_index = 0;
     for(int x = 0; x < block_width; x++){
       if(index > n_in_bytes * 8 - 1) break;
       for(int y = 0; y < block_height; y++){
@@ -387,10 +388,12 @@ int encrypt_png_file()
           isaac(isaac_buffer, 256);
         }
 
+        if(bytes_per_pixel > 1) pixel_index = isaac_buffer[rand_count] % (bytes_per_pixel - 1);
+
         if((1 & isaac_buffer[rand_count]) ^ (1 & (in_bytes[index / 8] >> (7 - (index % 8))))){
-          decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] |= 1;
+          decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x) + pixel_index] |= 1;
         }else{
-          decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] &= (~1);
+          decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x) + pixel_index] &= (~1);
         }
 
         rand_count++;
