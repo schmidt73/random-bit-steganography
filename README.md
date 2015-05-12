@@ -41,13 +41,13 @@ More usage documentation will be coming soon.
 
 **Developement**
 
-Currently the project is being developed solely by one person, myself. Currently I am not very far and am currently working on steganography through PNG files.
+Currently the project is being developed solely by one person, myself. Currently I just finished PNG support and I am going to work on other image formats.
 
 Progress:
 
 * Random Number Generator Implementation (Complete)
-* Usage Information (Complete for now)
-* PNG file support (Working)
+* Usage Information (Complete)
+* PNG file support (Complete)
 * MP3 file support (Not started)
 * JPG/JPEG file support (Not started)
 * GIF file support (Not started)
