@@ -1,6 +1,7 @@
 #include "steganography.h"
 
-#define SUPPORTED_FILE_TYPES {"gif", "png", "jpeg", "jpg", "mp3"}
+#define SUPPORTED_FILE_TYPES {"png"}
+#define PROGRAM_VERSION "0.5"
 #define PROGRAM_NAME "random-bit stegano"
 
 const char* get_filename_ext(const char *filename) 
@@ -12,7 +13,7 @@ const char* get_filename_ext(const char *filename)
 
 void print_version()
 {
-	fprintf(stderr, "%s is a program created by Henri Schmidt.\nCurrently running version 4.2.\n", PROGRAM_NAME);
+	fprintf(stderr, "%s is a program created by Henri Schmidt.\nCurrently running version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
 }
 
 void print_usage()
@@ -23,7 +24,7 @@ void print_usage()
 	fprintf(stderr, "\t-m mode: encryption or decryption\n");
 	fprintf(stderr, "\t-k encryptionkey: up to a 1024-byte encryption key\n\t\texample: -k 58313907894542357986579124\n");
 	fprintf(stderr, "\t-t filetype: the type of file of the inputfile\n");
-	fprintf(stderr, "\t\tsupported file types:");
+	fprintf(stderr, "\t\tcurrently supported file types:");
 
 	for(int i = 0; i < sizeof(supported_files) / sizeof(supported_files[0]); i++){
 		fprintf(stderr, " %s", supported_files[i]);
