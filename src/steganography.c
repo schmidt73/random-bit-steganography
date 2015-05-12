@@ -48,12 +48,14 @@ int init_decrypting_data(const char* type, const char* inputfile)
 	}else if(strcmp(type, "mp3") == 0){
 
 	}else if(strcmp(type, "png") == 0){
-		if(init_png_file(inputfile) == 0){
-			ret = decrypt_png_file();
+		if((ret = init_png_file(inputfile)) == 0){
+			if((ret = decrypt_png_file()) == 0){
+				fprintf(stderr, "sucessfully decrypted data from %s\n", inputfile);
+			}
 		}
 	}else{
 		fprintf(stderr, "undetected file type: %s\nplease specify a known file type\n", type);
-		ret = -1;
+		ret = 1;
 	}
 
 	return ret;
@@ -70,8 +72,10 @@ int init_encrypting_data(const char* type, const char* inputfile)
 	}else if(strcmp(type, "mp3") == 0){
 
 	}else if(strcmp(type, "png") == 0){
-		if(init_png_file(inputfile) == 0){
-			ret = encrypt_png_file();
+		if((ret = init_png_file(inputfile)) == 0){
+			if((ret = encrypt_png_file()) == 0){
+				fprintf(stderr, "sucessfully encrypted data into %s\n", inputfile);
+			}
 		}
 	}else{
 		fprintf(stderr, "undetected file type: %s\nplease specify a known file type\n", type);

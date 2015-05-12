@@ -7,11 +7,6 @@ static unsigned int width = 0;
 static size_t png_size = 0;
 static LodePNGState state;
 
-/* Returns the start of the block */
-static unsigned int find_highest_complexity_block(unsigned long int number_of_bytes, unsigned int *block_height, unsigned int *block_width){
-  return 0;
-}
-
 int init_png_file(const char* input_file)
 {
   unsigned int error = 0;
@@ -54,7 +49,9 @@ int init_png_file(const char* input_file)
 int decrypt_png_file()
 {
   unsigned long int first_isaac_buffer[256];
+  unsigned long int isaac_buffer[256];
   isaac(first_isaac_buffer, 256);
+  isaac(isaac_buffer, 256);
 
   int bitdepth = state.info_raw.bitdepth;
   int bits_per_pixel = -1;
@@ -89,9 +86,10 @@ int decrypt_png_file()
       break;
   }
 
+  lodepng_state_cleanup(&state);
+
   if(bits_per_pixel == -1){
     fprintf(stderr, "invalid bitdepth and color type\n");
-    lodepng_state_cleanup(&state);
     free(decoded_image_data);
     return 1;
   }
@@ -106,21 +104,125 @@ int decrypt_png_file()
   }
 
   if(number_of_bytes == 0){
-
+    fprintf(stderr, "couldn't read number_of_bytes\n");
+    free(decoded_image_data);
+    return 1;
   }
 
+  unsigned int block_area = number_of_bytes * 8;
+
+  if(block_area > (width * height) - (sizeof(uint32_t) * 8)){
+    fprintf(stderr, "invalid number of bytes for image size\n");
+    free(decoded_image_data);
+    return 1;
+  }
+
+  unsigned int height_mask = 1;
+  while(height_mask < height){
+    height_mask = (height_mask << 1) + 1;
+  }
+
+  unsigned int width_mask = 1;
+  while(width_mask < width){
+    width_mask = (width_mask << 1) + 1;
+  }
+
+  unsigned int block_width = 0, block_height = 0, block_x = 0, block_y = 0;
+
+  int index = 0;
+  int count = 0;
+  while((block_width * block_height) < block_area || block_width > width || block_height > (height - 1)){
+    if(count < 1000){
+      if(index + 1 > 255){
+        isaac(isaac_buffer, 256);
+        index = 0;
+      }
+
+      block_height = isaac_buffer[index] & height_mask;
+      block_width = isaac_buffer[index + 1] & width_mask;
+      index += 2;
+    }else{
+      if(block_height > (height - 1)) block_height = height - 2;
+      if(block_width > width) block_width = width - 1;
+      if((block_width * block_height) < block_area){
+        block_width = width;
+        block_height = height - 1;
+      }
+
+      break;
+    }
+    count++;
+  }
+
+  count = 0;
+  do{
+    if(count < 1000){
+      if(index + 1> 255){
+        isaac(isaac_buffer, 256);
+        index = 0;
+      }
+
+      block_x = isaac_buffer[index] & width_mask;
+      block_y = isaac_buffer[index + 1] & height_mask;
+      index += 2;
+    }else{
+      if(block_y + block_height > height) block_y = 1;
+      if(block_x + block_width > width) block_x = 0;
+      if(block_y < 1) block_y = 1;
+      break;
+    }
+    
+    count++; 
+  }while((block_x + block_width > width) || (block_y + block_height > (height - 1)) || block_y < 1);
+
+  if(bits_per_pixel % 8 == 0){
+    int bytes_per_pixel = bits_per_pixel / 8;
+    index = 0;
+    int rand_count = 0;
+    unsigned char current_char = 0;
+    unsigned char* char_pointer = &current_char;
+
+    for(int x = 0; x < block_width; x++){
+      if(index > number_of_bytes * 8 - 1) break;
+      for(int y = 0; y < block_height; y++){
+        if(index > number_of_bytes * 8 - 1) break;
+        if(rand_count > 255){
+          rand_count = 0;
+          isaac(isaac_buffer, 256);
+        }
+
+        int bit = ((1 & isaac_buffer[rand_count]) ^ (decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] & 1));
+
+        if(index % 8 == 0 && index != 0){
+          fwrite(char_pointer, sizeof(char), 1, stdout);
+          fflush(stdout);
+          current_char = 0;
+        }
+
+        current_char += bit;
+        if(index % ((8 * ((index / 8) + 1)) - 1) != 0 || index == 0) current_char = current_char << 1;
+
+        rand_count++;
+        index++;
+      }
+    }
+
+    fwrite(char_pointer, sizeof(char), 1, stdout);
+    fflush(stdout);
+  }
+
+  free(decoded_image_data);
   return 0;
 }
-
-
 
 int encrypt_png_file()
 {
   unsigned int block_width = 0, block_height = 0, block_x = 0, block_y = 0;
+
   unsigned long int first_isaac_buffer[256];
   unsigned long int isaac_buffer[256];
-
   isaac(first_isaac_buffer, 256);
+  isaac(isaac_buffer, 256);
 
   unsigned char in_buffer[1024];
   unsigned char* in_bytes = 0;
@@ -131,7 +233,7 @@ int encrypt_png_file()
     if(in_bytes == NULL){
       in_bytes = malloc(n_in_bytes + count);
     }else{
-      in_bytes = realloc(in_bytes + n_in_bytes, n_in_bytes + count);
+      in_bytes = realloc(in_bytes, n_in_bytes + count);
     }
 
     memcpy(in_bytes + n_in_bytes, in_buffer, count);
@@ -140,6 +242,7 @@ int encrypt_png_file()
       break;
     }
   }
+
   
   if(in_bytes == NULL){
     fprintf(stderr, "read failed\n");
@@ -149,9 +252,16 @@ int encrypt_png_file()
   }
 
   unsigned int block_area = n_in_bytes * 8;
+  if(height < 2 || width < 4){
+    fprintf(stderr, "image needs to be at least 2 pixels (height) by 4 pixels (width)\n");
+    free(in_bytes);
+    lodepng_state_cleanup(&state);
+    free(decoded_image_data);
+    return 1;
+  }
 
-  if(block_area > (width * height) - (sizeof(uint32_t) * 8)){
-    fprintf(stderr, "not enough space in image to encode data\n");
+  if(block_area > (width * (height - 1))){
+    fprintf(stderr, "not enough space in image to encode data\nmax number_of_bytes to encrypt = %d\n", (width * (height - 1)) / 8);
     free(in_bytes);
     lodepng_state_cleanup(&state);
     free(decoded_image_data);
@@ -169,28 +279,50 @@ int encrypt_png_file()
   }
 
   int index = 0;
-  while((block_width * block_height) < block_area || block_width > width || block_height > height){
-    if(index + 1 > 255){
-      isaac(isaac_buffer, 256);
-      index = 0;
-    }
+  count = 0;
+  while((block_width * block_height) < block_area || block_width > width || block_height > (height - 1)){
+    if(count < 1000){
+      if(index + 1 > 255){
+        isaac(isaac_buffer, 256);
+        index = 0;
+      }
 
-    block_height = isaac_buffer[index] & height_mask;
-    block_width = isaac_buffer[index + 1] & width_mask;
-    index += 2;
+      block_height = isaac_buffer[index] & height_mask;
+      block_width = isaac_buffer[index + 1] & width_mask;
+      index += 2;
+    }else{
+      if(block_height > (height - 1)) block_height = height - 2;
+      if(block_width > width) block_width = width - 1;
+      if((block_width * block_height) < block_area){
+        block_width = width;
+        block_height = height - 1;
+      }
+
+      break;
+    }
+    count++;
   }
 
-  index = 0;
+  count = 0;
   do{
-    if(index + 1> 255){
-      isaac(isaac_buffer, 256);
-      index = 0;
-    }
+    if(count < 1000){
+      if(index + 1> 255){
+        isaac(isaac_buffer, 256);
+        index = 0;
+      }
 
-    block_x = isaac_buffer[index] & width_mask;
-    block_y = isaac_buffer[index + 1] & height_mask;
-    index += 2;
-  }while((block_x + block_width > width) || (block_y + block_height > height) || block_x < (sizeof(uint32_t) * 8));
+      block_x = isaac_buffer[index] & width_mask;
+      block_y = isaac_buffer[index + 1] & height_mask;
+      index += 2;
+    }else{
+      if(block_y + block_height > height) block_y = 1;
+      if(block_x + block_width > width) block_x = 0;
+      if(block_y < 1) block_y = 1;
+      break;
+    }
+    
+    count++; 
+  }while((block_x + block_width > width) || (block_y + block_height > (height - 1)) || block_y < 1);
 
   int bitdepth = state.info_raw.bitdepth;
   int bits_per_pixel = -1;
@@ -223,8 +355,6 @@ int encrypt_png_file()
     default:
       break;
   }
-
-  fprintf(stderr, "block_width %d width: %d block_height: %d height: %d block_x: %d block_y: %d bits_per_pixel: %d colortype: %d\n", block_width, width, block_height, height, block_x, block_y, bits_per_pixel, state.info_raw.colortype);
 
   if(bits_per_pixel == -1){
     fprintf(stderr, "invalid bitdepth and color type\n");
@@ -245,16 +375,25 @@ int encrypt_png_file()
     }
 
     index = 0;
+    int rand_count = 0;
+    unsigned char current_char = 0;
     for(int x = 0; x < block_width; x++){
-      if(index >= n_in_bytes * 8) break;
+      if(index > n_in_bytes * 8 - 1) break;
       for(int y = 0; y < block_height; y++){
-        if(index >= n_in_bytes * 8) break;
-        if(1 & (in_bytes[index / 8] >> index % 8)){
+        if(index > n_in_bytes * 8 - 1) break;
+    
+        if(rand_count > 255){
+          rand_count = 0;
+          isaac(isaac_buffer, 256);
+        }
+
+        if((1 & isaac_buffer[rand_count]) ^ (1 & (in_bytes[index / 8] >> (7 - (index % 8))))){
           decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] |= 1;
         }else{
           decoded_image_data[bytes_per_pixel * (y + block_y) * width + bytes_per_pixel * (x + block_x)] &= (~1);
         }
 
+        rand_count++;
         index++;
       }
     }
@@ -265,7 +404,6 @@ int encrypt_png_file()
     free(decoded_image_data);
     return 1;
   }
-
   free(in_bytes);
 
   unsigned char* output_png = 0;
