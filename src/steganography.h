@@ -1,18 +1,17 @@
 #ifndef STEGANOGRAPHY_HEADER
 #define STEGANOGRAPHY_HEADER
 
-#include "random.h"
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
-#include "methods/png.h"
+#include "png.h"
+#include "random.h"
 
-const char* get_filename_ext(const char *filename);
-void print_version();
-void print_usage();
-int init_decrypting_data(const char* type, const char* inputfile);
-int init_encrypting_data(const char* type, const char* inputfile);
+void print_error(FILE *out, const char *fmt, ...);
+void print_success(FILE *out, const char *fmt, ...);
+void print_status(FILE *out, const char *fmt, ...);
 
 #endif

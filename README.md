@@ -6,6 +6,12 @@ The goal of this project is simple: to create a method of steganography that hid
 
 This is where Random Bit Steganography comes in. R.B.S hides each bit of data at a location within the file that is random, while not effecting the quality of the carrier to much, wether it be an image, an audio file, etc. This is very beneficial as steganylsis software could no longer retrieve the data purely by reversing the algorithm. 
 
+**Dependencies**
+
+The following dependencies are required:
+
+* [mpg123](http://www.mpg123.de/)
+
 **Installation**
 
 To install just clone the git repository or download the zip repository.

@@ -4,41 +4,80 @@
 #define PROGRAM_VERSION "0.5"
 #define PROGRAM_NAME "random-bit stegano"
 
-const char* get_filename_ext(const char *filename) 
+#define BOLD_BLUE  "\033[1m\033[34m"
+#define BOLD_RED "\033[1m\033[31m"
+#define BOLD_GREEN "\033[1m\033[32m"
+#define RESET "\033[0m"
+
+static int verbose = 1;
+
+void print_status(FILE *out, const char *fmt, ...)
+{
+	if(verbose){ 
+		fprintf(stderr, BOLD_BLUE "status: " RESET);
+		va_list ap;
+	    va_start(ap, fmt);
+	    vfprintf(out, fmt, ap);
+	    va_end(ap);	
+	}   
+}
+
+void print_error(FILE *out, const char *fmt, ...)
+{
+	if(verbose){ 
+		fprintf(stderr, BOLD_RED "error: " RESET);
+		va_list ap;
+	    va_start(ap, fmt);
+	    vfprintf(out, fmt, ap);
+	    va_end(ap);	
+	}   
+}
+
+void print_success(FILE *out, const char *fmt, ...){
+	if(verbose){ 
+		fprintf(stderr, BOLD_GREEN "success: " RESET);
+		va_list ap;
+	    va_start(ap, fmt);
+	    vfprintf(out, fmt, ap);
+	    va_end(ap);	
+	}   
+}
+
+static const char* get_filename_ext(const char *filename) 
 {
     const char *dot = strrchr(filename, '.');
     if(!dot || dot == filename) return "";
     return dot + 1;
 }
 
-void print_version()
+static void print_version()
 {
-	fprintf(stderr, "%s is a program created by Henri Schmidt.\nCurrently running version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
+	print_success(stderr, "%s is a program created by Henri Schmidt.\ncurrently running version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
 }
 
-void print_usage()
+static void print_usage()
 {
 	const char* supported_files[] = SUPPORTED_FILE_TYPES;
 
-	fprintf(stderr, "usage: %s [-t filetype] -m encryption | decryption -k encryptionkey -i inputfile [< | > datastream]\n", PROGRAM_NAME);
-	fprintf(stderr, "\t-m mode: encryption or decryption\n");
-	fprintf(stderr, "\t-k encryptionkey: up to a 1024-byte encryption key\n\t\texample: -k 58313907894542357986579124\n");
-	fprintf(stderr, "\t-t filetype: the type of file of the inputfile\n");
-	fprintf(stderr, "\t\tcurrently supported file types:");
+	print_success(stderr, "usage: %s [-t filetype] -m encryption | decryption -k encryptionkey -i inputfile [< | > datastream]\n", PROGRAM_NAME);
+	print_success(stderr, "\t-m mode: encryption or decryption\n");
+	print_success(stderr, "\t-k encryptionkey: up to a 1024-byte encryption key\n\t\texample: -k hjsahdjkhasdjk123aln23asd\n");
+	print_success(stderr, "\t-t filetype: the type of file of the inputfile\n");
+	print_success(stderr, "\t\tcurrently supported file types:");
 
-	for(int i = 0; i < sizeof(supported_files) / sizeof(supported_files[0]); i++){
-		fprintf(stderr, " %s", supported_files[i]);
+	for(unsigned long int i = 0; i < sizeof(supported_files) / sizeof(supported_files[0]); i++){
+		print_success(stderr, " %s", supported_files[i]);
 	}
 
-	fprintf(stderr, " (attempts to detect filetype based off extension if not specified)\n");
-	fprintf(stderr, "\t-i inputfile: the file the data will be hidden inside of if encyp\n");
-	fprintf(stderr, "\tdatastream\n\t\tduring encryption a pipe containing the data to encrypt\n\t\tduring decryption a pipe to the output of the decryption\n");
-	fprintf(stderr, "\ntypical usage example:\n");
-	fprintf(stderr, "\tencrypt data from inputdata.txt in png test.png: %s -m encryption -k 12321312312312312312312 -i test.png < inputdata.txt\n", PROGRAM_NAME);
-	fprintf(stderr, "\tdecrypt data from test.png and put output in output.txt: %s -m decryption -k 12321312312312312312312 -i test.png > output.txt\n", PROGRAM_NAME);
+	print_success(stderr, " (attempts to detect filetype based off extension if not specified)\n");
+	print_success(stderr, "\t-i inputfile: the file the data will be hidden inside of if encyp\n");
+	print_success(stderr, "\tdatastream\n\t\tduring encryption a pipe containing the data to encrypt\n\t\tduring decryption a pipe to the output of the decryption\n");
+	print_success(stderr, "\ntypical usage example:\n");
+	print_success(stderr, "\tencrypt data from inputdata.txt in png test.png: %s -m encryption -k xik230a93u419832132z -i test.png < inputdata.txt\n", PROGRAM_NAME);
+	print_success(stderr, "\tdecrypt data from test.png and put output in output.txt: %s -m decryption -k xik230a93u419832132z -i test.png > output.txt\n", PROGRAM_NAME);
 }
 
-int init_decrypting_data(const char* type, const char* inputfile)
+static int init_decrypting_data(const char* type, const char* inputfile)
 {
 	int ret = 0;
 
@@ -49,20 +88,23 @@ int init_decrypting_data(const char* type, const char* inputfile)
 	}else if(strcmp(type, "mp3") == 0){
 
 	}else if(strcmp(type, "png") == 0){
+		print_status(stderr, "attempting to initialize png...\n");
 		if((ret = init_png_file(inputfile)) == 0){
+			print_success(stderr, "successfully initialized png.\n");
+			print_status(stderr, "currently attempting decryption...\n");
 			if((ret = decrypt_png_file()) == 0){
-				fprintf(stderr, "sucessfully decrypted data from %s\n", inputfile);
+				print_success(stderr, "sucessfully decrypted data from %s\n", inputfile);
 			}
 		}
 	}else{
-		fprintf(stderr, "undetected file type: %s\nplease specify a known file type\n", type);
+		print_error(stderr, "undetected file type: %s\nplease specify a known file type\n", type);
 		ret = 1;
 	}
 
 	return ret;
 }
 
-int init_encrypting_data(const char* type, const char* inputfile)
+static int init_encrypting_data(const char* type, const char* inputfile)
 {
 	int ret = 0;
 
@@ -73,13 +115,16 @@ int init_encrypting_data(const char* type, const char* inputfile)
 	}else if(strcmp(type, "mp3") == 0){
 
 	}else if(strcmp(type, "png") == 0){
+		print_status(stderr, "attempting to initialize png...\n");
 		if((ret = init_png_file(inputfile)) == 0){
+			print_success(stderr, "successfully initialized png.\n");
+			print_status(stderr, "currently attempting encryption...\n");
 			if((ret = encrypt_png_file()) == 0){
-				fprintf(stderr, "sucessfully encrypted data into %s\n", inputfile);
+				print_success(stderr, "sucessfully encrypted data into %s\n", inputfile);
 			}
 		}
 	}else{
-		fprintf(stderr, "undetected file type: %s\nplease specify a known file type\n", type);
+		print_error(stderr, "undetected file type: %s\nplease specify a known file type\n", type);
 		ret = -1;
 	}
 
@@ -90,7 +135,6 @@ int main(int argc, char **argv)
 {	
 	const char* type = 0, *inputfile = 0, *mode = 0;
 	char key[1024] = {0};
-	unsigned int key_length = 0;
 	int c = -1;
 
 	for(int i = 0; i < argc; i++){
@@ -134,7 +178,7 @@ int main(int argc, char **argv)
 				return -1;
 				break;
 			default:
-				fprintf(stderr, "Error!");
+				print_error(stderr, "error parsing arguments.");
 		}
 	}
 

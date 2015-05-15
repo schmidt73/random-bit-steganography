@@ -24,7 +24,7 @@ void isaac(unsigned long int* buffer, int length)
     randrsl[i] = bb = mm[(y>>10)%256] + x;
   }
 
-  for(i = 0; i < length && i < 256; i++){
+  for(i = 0; i < (unsigned long int) length && i < 256; i++){
     buffer[i] = randrsl[i];
   }
 }
