@@ -2,7 +2,7 @@
 
 #define SUPPORTED_FILE_TYPES {"png"}
 #define PROGRAM_VERSION "0.5"
-#define PROGRAM_NAME "random-bit stegano"
+#define PROGRAM_NAME "random-bit-stegano"
 
 #define BOLD_BLUE  "\033[1m\033[34m"
 #define BOLD_RED "\033[1m\033[31m"
@@ -52,29 +52,29 @@ static const char* get_filename_ext(const char *filename)
 
 static void print_version()
 {
-	print_success(stderr, "%s is a program created by Henri Schmidt.\ncurrently running version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
+	fprintf(stderr, "%s is a program created by Henri Schmidt.\ncurrently running version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
 }
 
 static void print_usage()
 {
 	const char* supported_files[] = SUPPORTED_FILE_TYPES;
 
-	print_success(stderr, "usage: %s [-t filetype] -m encryption | decryption -k encryptionkey -i inputfile [< | > datastream]\n", PROGRAM_NAME);
-	print_success(stderr, "\t-m mode: encryption or decryption\n");
-	print_success(stderr, "\t-k encryptionkey: up to a 1024-byte encryption key\n\t\texample: -k hjsahdjkhasdjk123aln23asd\n");
-	print_success(stderr, "\t-t filetype: the type of file of the inputfile\n");
-	print_success(stderr, "\t\tcurrently supported file types:");
+	fprintf(stderr, "usage: %s [-t filetype] -m encryption | decryption -k encryptionkey -i inputfile [< | > datastream]\n", PROGRAM_NAME);
+	fprintf(stderr, "\t-m mode: encryption or decryption\n");
+	fprintf(stderr, "\t-k encryptionkey: up to a 1024-byte encryption key\n\t\texample: -k hjsahdjkhasdjk123aln23asd\n");
+	fprintf(stderr, "\t-t filetype: the type of file of the inputfile\n");
+	fprintf(stderr, "\t\tcurrently supported file types:");
 
 	for(unsigned long int i = 0; i < sizeof(supported_files) / sizeof(supported_files[0]); i++){
-		print_success(stderr, " %s", supported_files[i]);
+		fprintf(stderr, " %s", supported_files[i]);
 	}
 
-	print_success(stderr, " (attempts to detect filetype based off extension if not specified)\n");
-	print_success(stderr, "\t-i inputfile: the file the data will be hidden inside of if encyp\n");
-	print_success(stderr, "\tdatastream\n\t\tduring encryption a pipe containing the data to encrypt\n\t\tduring decryption a pipe to the output of the decryption\n");
-	print_success(stderr, "\ntypical usage example:\n");
-	print_success(stderr, "\tencrypt data from inputdata.txt in png test.png: %s -m encryption -k xik230a93u419832132z -i test.png < inputdata.txt\n", PROGRAM_NAME);
-	print_success(stderr, "\tdecrypt data from test.png and put output in output.txt: %s -m decryption -k xik230a93u419832132z -i test.png > output.txt\n", PROGRAM_NAME);
+	fprintf(stderr, " (attempts to detect filetype based off extension if not specified)\n");
+	fprintf(stderr, "\t-i inputfile: the file the data will be hidden inside of if encyp\n");
+	fprintf(stderr, "\tdatastream\n\t\tduring encryption a pipe containing the data to encrypt\n\t\tduring decryption a pipe to the output of the decryption\n");
+	fprintf(stderr, "\ntypical usage example:\n");
+	fprintf(stderr, "\tencrypt data from inputdata.txt in png test.png: %s -m encryption -k xik230a93u419832132z -i test.png < inputdata.txt\n", PROGRAM_NAME);
+	fprintf(stderr, "\tdecrypt data from test.png and put output in output.txt: %s -m decryption -k xik230a93u419832132z -i test.png > output.txt\n", PROGRAM_NAME);
 }
 
 static int init_decrypting_data(const char* type, const char* inputfile)
@@ -86,7 +86,14 @@ static int init_decrypting_data(const char* type, const char* inputfile)
 	}else if(strcmp(type, "jpeg") == 0 || strcmp(type, "jpg") == 0){
 
 	}else if(strcmp(type, "mp3") == 0){
-
+		print_status(stderr, "attempting to initialize mp3 file...\n");
+		if((ret = init_mp3_file(inputfile)) == 0){
+			print_success(stderr, "successfully initialized mp3.\n");
+			print_status(stderr, "currently attempting decryption...\n");
+			if((ret = decrypt_mp3_file(inputfile)) == 0){
+				print_success(stderr, "successfully decrypted data from %s\n", inputfile);
+			}
+		}
 	}else if(strcmp(type, "png") == 0){
 		print_status(stderr, "attempting to initialize png...\n");
 		if((ret = init_png_file(inputfile)) == 0){
@@ -113,7 +120,14 @@ static int init_encrypting_data(const char* type, const char* inputfile)
 	}else if(strcmp(type, "jpeg") == 0 || strcmp(type, "jpg") == 0){
 
 	}else if(strcmp(type, "mp3") == 0){
-
+		print_status(stderr, "attempting to initialize mp3 file...\n");
+		if((ret = init_mp3_file(inputfile)) == 0){
+			print_success(stderr, "successfully initialized png.\n");
+			print_status(stderr, "currently attempting encryption...\n");
+			if((ret = encrypt_mp3_file(inputfile)) == 0){
+				print_success(stderr, "successfully encrypted data into %s\n", inputfile);
+			}
+		}
 	}else if(strcmp(type, "png") == 0){
 		print_status(stderr, "attempting to initialize png...\n");
 		if((ret = init_png_file(inputfile)) == 0){
@@ -133,7 +147,7 @@ static int init_encrypting_data(const char* type, const char* inputfile)
 
 int main(int argc, char **argv)
 {	
-	const char* type = 0, *inputfile = 0, *mode = 0;
+	const char* type = NULL, *inputfile = NULL, *mode = NULL;
 	char key[1024] = {0};
 	int c = -1;
 

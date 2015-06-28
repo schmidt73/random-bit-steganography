@@ -7,7 +7,9 @@ EXEC = rb-stegano
 SOURCES = $(wildcard src/*.c deps/lodepng/*.c)
 OBJECTS = $(SOURCES:.c=.o)
 
-# Dependencies
+# Dependencies MUST COMPILE mp3lame with HAVE_MPGLIB
+LIBRARIES = mp3lame mpg123
+LIBRARY_PARAMS = $(foreach d, $(LIBRARIES), -l$d)
 INCLUDE = deps
 
 # Includes
@@ -16,7 +18,7 @@ INC_PARAMS = $(foreach d, $(INC), -I$d)
 
 # Main target
 $(EXEC): $(OBJECTS)
-	$(CC) $(OBJECTS) -o $(EXEC)
+	$(CC) $(LIBRARY_PARAMS) $(OBJECTS) -o $(EXEC)
 
 # To obtain object files
 %.o: %.c

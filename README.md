@@ -11,6 +11,7 @@ This is where Random Bit Steganography comes in. R.B.S hides each bit of data at
 The following dependencies are required:
 
 * [mpg123](http://www.mpg123.de/)
+* [LAME (libmp3lame)](https://github.com/VFR-maniac/lame)
 
 **Installation**
 
@@ -24,7 +25,7 @@ Then run the makefile, which will compile the program.
 
 **Usage**
 
-Output of ./rb-stegano -help:
+Example output of ./rb-stegano -help:
 
 ```
 usage: random-bit stegano [-t filetype] -m encryption | decryption -k encryptionkey -i inputfile [< | > datastream]
@@ -54,7 +55,7 @@ Progress:
 * Random Number Generator Implementation (Complete)
 * Usage Information (Complete)
 * PNG file support (Complete)
-* MP3 file support (Not started)
+* MP3 file support (Not currently working)
 * JPG/JPEG file support (Not started)
 * GIF file support (Not started)
 * More to come

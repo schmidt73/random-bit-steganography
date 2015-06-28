@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include "png.h"
+#include "mp3.h"
 #include "random.h"
 
 void print_error(FILE *out, const char *fmt, ...);
